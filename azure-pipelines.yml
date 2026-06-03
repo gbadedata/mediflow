@@ -1,0 +1,99 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - terraform/**
+      - "*.md"
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  imageRepository: "mediflow"
+  containerRegistry: "acr-mediflow"
+  acrLoginServer: "acrmediflowdev.azurecr.io"
+  dockerfilePath: "Dockerfile"
+  tag: "$(Build.BuildId)"
+  kubernetesServiceConnection: "aks-mediflow"
+  namespace: "mediflow"
+  helmReleaseName: "mediflow"
+  helmChartPath: "helm/mediflow"
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Test
+    displayName: "Run tests"
+    jobs:
+      - job: Pytest
+        displayName: "pytest"
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+            displayName: "Use Python 3.12"
+
+          - script: |
+              pip install -r requirements.txt
+              python -m pytest tests/ -v --tb=short
+            displayName: "Install dependencies and run pytest"
+
+  - stage: Build
+    displayName: "Build and push image"
+    dependsOn: Test
+    condition: succeeded()
+    jobs:
+      - job: BuildPush
+        displayName: "Docker build and push to ACR"
+        steps:
+          - task: Docker@2
+            displayName: "Build and push to ACR"
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(containerRegistry)
+              tags: |
+                $(tag)
+                latest
+
+  - stage: Deploy
+    displayName: "Deploy to AKS"
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: HelmDeploy
+        displayName: "Helm upgrade on AKS"
+        environment: "dev"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: HelmDeploy@1
+                  displayName: "Create namespace if not exists"
+                  inputs:
+                    connectionType: "Kubernetes Service Connection"
+                    kubernetesServiceConnection: $(kubernetesServiceConnection)
+                    command: "kubectl"
+                    arguments: "create namespace $(namespace) --dry-run=client -o yaml | kubectl apply -f -"
+
+                - task: HelmDeploy@1
+                  displayName: "Helm upgrade mediflow"
+                  inputs:
+                    connectionType: "Kubernetes Service Connection"
+                    kubernetesServiceConnection: $(kubernetesServiceConnection)
+                    namespace: $(namespace)
+                    command: upgrade
+                    chartType: filepath
+                    chartPath: $(helmChartPath)
+                    releaseName: $(helmReleaseName)
+                    overrideValues: "image.repository=$(acrLoginServer)/$(imageRepository),image.tag=$(tag)"
+                    install: true
+                    waitForExecution: true

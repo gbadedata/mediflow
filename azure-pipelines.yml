@@ -76,13 +76,20 @@ stages:
               steps:
                 - checkout: self
 
-                - task: HelmDeploy@1
-                  displayName: "Create namespace if not exists"
+                - task: KubernetesManifest@1
+                  displayName: "Create namespace"
                   inputs:
-                    connectionType: "Kubernetes Service Connection"
+                    action: createSecret
+                    connectionType: kubernetesServiceConnection
                     kubernetesServiceConnection: $(kubernetesServiceConnection)
-                    command: "kubectl"
-                    arguments: "create namespace $(namespace) --dry-run=client -o yaml | kubectl apply -f -"
+                    namespace: $(namespace)
+                    secretType: generic
+                    secretName: placeholder
+                  continueOnError: true
+
+                - script: |
+                    echo "Namespace: $(namespace)"
+                  displayName: "Confirm namespace"
 
                 - task: HelmDeploy@1
                   displayName: "Helm upgrade mediflow"

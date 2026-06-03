@@ -76,21 +76,6 @@ stages:
               steps:
                 - checkout: self
 
-                - task: KubernetesManifest@1
-                  displayName: "Create namespace"
-                  inputs:
-                    action: createSecret
-                    connectionType: kubernetesServiceConnection
-                    kubernetesServiceConnection: $(kubernetesServiceConnection)
-                    namespace: $(namespace)
-                    secretType: generic
-                    secretName: placeholder
-                  continueOnError: true
-
-                - script: |
-                    echo "Namespace: $(namespace)"
-                  displayName: "Confirm namespace"
-
                 - task: HelmDeploy@1
                   displayName: "Helm upgrade mediflow"
                   inputs:
@@ -104,3 +89,4 @@ stages:
                     overrideValues: "image.repository=$(acrLoginServer)/$(imageRepository),image.tag=$(tag)"
                     install: true
                     waitForExecution: true
+                    arguments: "--create-namespace"

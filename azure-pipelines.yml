@@ -32,14 +32,9 @@ stages:
       - job: Pytest
         displayName: "pytest"
         steps:
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: "3.12"
-            displayName: "Use Python 3.12"
-
           - script: |
-              pip install -r requirements.txt
-              python -m pytest tests/ -v --tb=short
+              python3 -m pip install -r requirements.txt
+              python3 -m pytest tests/ -v --tb=short
             displayName: "Install dependencies and run pytest"
 
   - stage: Build

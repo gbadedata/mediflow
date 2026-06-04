@@ -23,8 +23,7 @@ variables:
   helmReleaseName: "mediflow"
   helmChartPath: "helm/mediflow"
 
-pool:
-  vmImage: ubuntu-latest
+pool: Default
 
 stages:
   - stage: Test

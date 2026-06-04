@@ -45,16 +45,20 @@ stages:
       - job: BuildPush
         displayName: "Docker build and push to ACR"
         steps:
+          - task: Docker@2
+            displayName: "Login to ACR"
+            inputs:
+              command: login
+              containerRegistry: $(containerRegistry)
+
           - script: |
-              az login --identity || true
-              docker login $(acrLoginServer) -u 00000000-0000-0000-0000-000000000000 -p $(az acr login --name acrmediflowdev --expose-token --query accessToken -o tsv)
-              docker buildx create --use --name multiarch || true
+              docker buildx create --use --name multiarch 2>/dev/null || docker buildx use multiarch
               docker buildx build \
                 --platform linux/amd64,linux/arm64 \
                 --tag $(acrLoginServer)/$(imageRepository):$(tag) \
                 --tag $(acrLoginServer)/$(imageRepository):latest \
                 --push .
-            displayName: "Build multi-arch image and push to ACR"
+            displayName: "Build multi-arch and push to ACR"
 
   - stage: Deploy
     displayName: "Deploy to AKS"
